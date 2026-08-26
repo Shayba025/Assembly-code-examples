@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+# Assemble, link and DEBUG one of the course's x86-64 Linux NASM programs in gdb.
+#
+#     ./debug "lectures code /code-0004.asm" 3
+#
+# gdb starts already stopped at the first instruction of `main`, with Intel
+# syntax and a live register window. Useful commands once you are there:
+#
+#     layout regs    split view: registers on top, source below
+#     si / ni        step one instruction (si follows `call`, ni steps over it)
+#     bt             backtrace -- the chain of unfinished calls
+#     info frame     the current stack frame: return address, saved rbp
+#     x/8gx $rsp     dump the top 8 quadwords of the stack
+#     p $rax         print a register
+#     c              continue,  q  quit
+set -euo pipefail
+
+if [ $# -lt 1 ]; then
+	echo "usage: $(basename "$0") file.asm [args...]" >&2
+	exit 1
+fi
+
+src="$1"; shift
+dir="$(cd "$(dirname "$src")" && pwd)"
+base="$(basename "$src" .asm)"
+
+docker run --rm -it -v "$dir:/work" -w /work asm-course \
+	bash -c 'set -e
+		nasm -f elf64 -g -F dwarf "$1.asm" -o "$1.o"
+		x86_64-linux-gnu-gcc -no-pie -o "$1" "$1.o"
+		prog="$1"; shift
+		qemu-x86_64 -L /usr/x86_64-linux-gnu -g 1234 "./$prog" "$@" &
+		sleep 0.7
+		exec gdb-multiarch -q \
+		     -ex "set confirm off" \
+		     -ex "set disassembly-flavor intel" \
+		     -ex "set architecture i386:x86-64" \
+		     -ex "file ./'"$base"'" \
+		     -ex "target remote :1234" \
+		     -ex "break main" \
+		     -ex "continue"' _ "$base" "$@"
