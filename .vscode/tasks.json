@@ -1,0 +1,103 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "asm: run current file",
+			"detail": "Assemble, link and run the .asm file in the active editor.",
+			"type": "shell",
+			"command": "\"${workspaceFolder}/asm\" \"${file}\"",
+			"group": { "kind": "build", "isDefault": true },
+			"presentation": {
+				"reveal": "always",
+				"panel": "dedicated",
+				"clear": true,
+				"focus": true
+			},
+			"problemMatcher": []
+		},
+		{
+			"label": "asm: run current file (with arguments)",
+			"detail": "Same, but prompts for command-line arguments first.",
+			"type": "shell",
+			"command": "\"${workspaceFolder}/asm\" \"${file}\" ${input:programArgs}",
+			"presentation": {
+				"reveal": "always",
+				"panel": "dedicated",
+				"clear": true,
+				"focus": true
+			},
+			"problemMatcher": []
+		},
+		{
+			"label": "asm: debug current file in gdb (TUI)",
+			"detail": "Full-screen gdb with a live register pane. Needs no extension.",
+			"type": "shell",
+			"command": "\"${workspaceFolder}/debug\" \"${file}\" ${input:programArgs}",
+			"presentation": {
+				"reveal": "always",
+				"panel": "dedicated",
+				"clear": true,
+				"focus": true
+			},
+			"problemMatcher": []
+		},
+		{
+			"label": "asm: start debug server",
+			"detail": "Used automatically by the F5 launch configuration.",
+			"type": "shell",
+			"command": "\"${workspaceFolder}/.vscode/dbgserver.sh\" \"${file}\" \"${input:programArgs}\"",
+			"presentation": {
+				"reveal": "silent",
+				"panel": "dedicated",
+				"clear": true,
+				"close": true
+			},
+			"problemMatcher": []
+		},
+		{
+			"label": "asm: program output",
+			"detail": "Live stdout/stderr of the program currently being debugged.",
+			"type": "shell",
+			"command": "docker logs -f asm-dbg",
+			"presentation": {
+				"reveal": "always",
+				"panel": "dedicated",
+				"clear": true,
+				"focus": false
+			},
+			"problemMatcher": []
+		},
+		{
+			"label": "asm: stop debug server",
+			"detail": "Used automatically when the F5 session ends.",
+			"type": "shell",
+			"command": "docker rm -f asm-dbg > /dev/null 2>&1 || true",
+			"presentation": { "reveal": "never", "panel": "shared", "close": true },
+			"problemMatcher": []
+		},
+		{
+			"label": "asm: rebuild the Docker toolchain",
+			"detail": "Run once after cloning, or after editing the Dockerfile.",
+			"type": "shell",
+			"command": "docker build -t asm-course \"${workspaceFolder}\"",
+			"presentation": { "reveal": "always", "panel": "dedicated", "clear": true },
+			"problemMatcher": []
+		},
+		{
+			"label": "asm: clean build artifacts",
+			"detail": "Delete every generated .o file and executable.",
+			"type": "shell",
+			"command": "find \"${workspaceFolder}/lectures code \" \"${workspaceFolder}/ps_code\" -type f ! -name '*.asm' ! -name '*.pdf' -delete && echo cleaned",
+			"presentation": { "reveal": "always", "panel": "dedicated", "clear": true },
+			"problemMatcher": []
+		}
+	],
+	"inputs": [
+		{
+			"id": "programArgs",
+			"type": "promptString",
+			"description": "Command-line arguments for the program (leave empty for none)",
+			"default": ""
+		}
+	]
+}

@@ -64,27 +64,27 @@
 ;;;   piece of state the callee must not disturb.
 ;;; ============================================================================
 
-section .data			; initialised, writable memory
+section .data                           ; initialised, writable memory
 fmt_sum:
-	db `The sum of %ld number(s) is %ld\n\0`
-				; `db` emits raw bytes; backquotes let \n and \0 be
-				;   real control characters. Two %ld conversions =
-				;   two 64-bit signed decimal arguments.
+        db `The sum of %ld number(s) is %ld\n\0`
+                                        ; `db` emits raw bytes; backquotes let \n and \0 be
+                                        ;   real control characters. Two %ld conversions =
+                                        ;   two 64-bit signed decimal arguments.
 i:
-	dq 1			; `dq` ("define quadword") emits 8 initialised
-				;   bytes. The loop index, starting at 1 so that
-				;   argv[0] (the program's own name) is skipped.
+        dq 1                            ; `dq` ("define quadword") emits 8 initialised
+                                        ;   bytes. The loop index, starting at 1 so that
+                                        ;   argv[0] (the program's own name) is skipped.
 sum:
-	dq 0			; the running total, initially zero
+        dq 0                            ; the running total, initially zero
 
-section .bss			; zero-filled at load time, no file space used
+section .bss                            ; zero-filled at load time, no file space used
 argc:
-	resq 1			; `resq 1` reserves one 8-byte slot for argc
+        resq 1                          ; `resq 1` reserves one 8-byte slot for argc
 argv:
-	resq 1			; ... and one for the argv pointer
+        resq 1                          ; ... and one for the argv pointer
 
-extern atoll, printf		; both live in the C library; the linker binds them
-global main			; export main so the C start-up code can call it
+extern atoll, printf                    ; both live in the C library; the linker binds them
+global main                             ; export main so the C start-up code can call it
 
 section .text
 ;;; ----------------------------------------------------------------------------
@@ -99,56 +99,56 @@ section .text
 ;;;                 register protection at all. Finally prints count and sum.
 ;;; ----------------------------------------------------------------------------
 main:
-	push rbp		; prologue 1/2: save the caller's frame pointer
-				;   (rbp is callee-saved -- we must return it intact)
-	mov rbp, rsp		; prologue 2/2: anchor the frame at the current top
-	and rsp, -16		; clear rsp's low 4 bits, rounding it DOWN to a
-				;   multiple of 16 as the ABI demands before `call`
+        push rbp                        ; prologue 1/2: save the caller's frame pointer
+                                        ;   (rbp is callee-saved -- we must return it intact)
+        mov rbp, rsp                    ; prologue 2/2: anchor the frame at the current top
+        and rsp, -16                    ; clear rsp's low 4 bits, rounding it DOWN to a
+                                        ;   multiple of 16 as the ABI demands before `call`
 
-	; recall: int main(int argc, char *argv[]) { ... }
-	mov qword [argc], rdi	; save argc out of the volatile register rdi and
-				;   into memory, where no callee can touch it
-	mov qword [argv], rsi	; same for argv
-.L:				; the start of the loop (local label, scoped to main)
-	mov rax, qword [i]	; load the index i into a register so we can both
-				;   compare it and use it as a scale factor
-	cmp rax, qword [argc]	; compare i against argc: `cmp` subtracts and keeps
-				;   only the resulting flags
-	je .done		; `je` (jump if equal) fires when i == argc, i.e.
-				;   we have consumed every argument
+                                        ; recall: int main(int argc, char *argv[]) { ... }
+        mov qword [argc], rdi           ; save argc out of the volatile register rdi and
+                                        ;   into memory, where no callee can touch it
+        mov qword [argv], rsi           ; same for argv
+.L:                                     ; the start of the loop (local label, scoped to main)
+        mov rax, qword [i]              ; load the index i into a register so we can both
+                                        ;   compare it and use it as a scale factor
+        cmp rax, qword [argc]           ; compare i against argc: `cmp` subtracts and keeps
+                                        ;   only the resulting flags
+        je .done                        ; `je` (jump if equal) fires when i == argc, i.e.
+                                        ;   we have consumed every argument
 
-	mov rdi, qword [argv]	; rdi = the address of the argv array
-	mov rdi, qword [rdi + 8*rax] ; dereference element i. The addressing mode
-				     ;   base + scale*index is computed by the CPU
-				     ;   at no extra cost; the scale is 8 because
-				     ;   each element is a 64-bit pointer. rdi now
-				     ;   holds argv[i] -- a char* -- which is
-				     ;   exactly atoll's one argument.
-	call atoll		     ; recall: long long atoll(char *);
-				     ;   Result comes back in rax. atoll is free to
-				     ;   destroy rdi/rsi/rdx/rcx/r8-r11.
-	add qword [sum], rax	; `add dst, src` = dst := dst + src. With a memory
-				;   destination this is a read-modify-write in one
-				;   instruction: no register needs to survive.
-	inc qword [i]		; `inc` adds 1 in place; advance to the next index
-	jmp .L			; unconditional jump back to the top of the loop
+        mov rdi, qword [argv]           ; rdi = the address of the argv array
+        mov rdi, qword [rdi + 8*rax]    ; dereference element i. The addressing mode
+                                        ;   base + scale*index is computed by the CPU
+                                        ;   at no extra cost; the scale is 8 because
+                                        ;   each element is a 64-bit pointer. rdi now
+                                        ;   holds argv[i] -- a char* -- which is
+                                        ;   exactly atoll's one argument.
+        call atoll                      ; recall: long long atoll(char *);
+                                        ;   Result comes back in rax. atoll is free to
+                                        ;   destroy rdi/rsi/rdx/rcx/r8-r11.
+        add qword [sum], rax            ; `add dst, src` = dst := dst + src. With a memory
+                                        ;   destination this is a read-modify-write in one
+                                        ;   instruction: no register needs to survive.
+        inc qword [i]                   ; `inc` adds 1 in place; advance to the next index
+        jmp .L                          ; unconditional jump back to the top of the loop
 
 .done:
-	mov rdi, fmt_sum	; printf argument 1: the format string's address
-	mov rsi, qword [argc]	; argument 2: number of arguments, incl the
-				;   executable name
-	dec rsi			; `dec` subtracts 1 -- ...but we don't count the
-				;   executable name, so report argc - 1
-	mov rdx, qword [sum]	; argument 3: the accumulated sum
-	mov rax, 0		; variadic rule: 0 vector registers carry arguments
-	call printf
+        mov rdi, fmt_sum                ; printf argument 1: the format string's address
+        mov rsi, qword [argc]           ; argument 2: number of arguments, incl the
+                                        ;   executable name
+        dec rsi                         ; `dec` subtracts 1 -- ...but we don't count the
+                                        ;   executable name, so report argc - 1
+        mov rdx, qword [sum]            ; argument 3: the accumulated sum
+        mov rax, 0                      ; variadic rule: 0 vector registers carry arguments
+        call printf
 
-	mov rax, 0		; return 0 to the shell: OK
+        mov rax, 0                      ; return 0 to the shell: OK
 
-	mov rsp, rbp		; epilogue 1/2: discard everything this frame did
-				;   to rsp by restoring it from the anchor
-	pop rbp			; epilogue 2/2: `pop` loads [rsp] and adds 8 --
-				;   the caller's rbp is back
-	ret			; pop the return address into rip and resume there
+        mov rsp, rbp                    ; epilogue 1/2: discard everything this frame did
+                                        ;   to rsp by restoring it from the anchor
+        pop rbp                         ; epilogue 2/2: `pop` loads [rsp] and adds 8 --
+                                        ;   the caller's rbp is back
+        ret                             ; pop the return address into rip and resume there
 
-section .note.GNU-stack noalloc noexec ; required Linux marker: stack is not exec
+section .note.GNU-stack noalloc noexec  ; required Linux marker: stack is not exec

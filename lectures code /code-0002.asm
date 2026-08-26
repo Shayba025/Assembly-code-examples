@@ -64,32 +64,32 @@
 ;;;   stack. Compare this with code-0004, where recursion does.
 ;;; ============================================================================
 
-section .data			; initialised, writable data
+section .data                           ; initialised, writable data
 fmt_argc:
-	db `There were %d argument(s) passed, `
-	db `including the executable path:\n\0`
-				; TWO `db` directives, no terminator on the first:
-				;   the bytes are simply emitted one after another,
-				;   so this is a single C string split across two
-				;   source lines for readability. Only the last one
-				;   carries the \0.
-				;   %d prints a 32-bit int (argc really is an int).
+        db `There were %d argument(s) passed, `
+        db `including the executable path:\n\0`
+                                        ; TWO `db` directives, no terminator on the first:
+                                        ;   the bytes are simply emitted one after another,
+                                        ;   so this is a single C string split across two
+                                        ;   source lines for readability. Only the last one
+                                        ;   carries the \0.
+                                        ;   %d prints a 32-bit int (argc really is an int).
 fmt_executable:
-	db `Executable: %s\n\0`	; %s takes a POINTER to a NUL-terminated string
-				;   and prints the characters it finds there.
+        db `Executable: %s\n\0`         ; %s takes a POINTER to a NUL-terminated string
+                                        ;   and prints the characters it finds there.
 fmt_command_line_arg:
-	db `argv[%d] = \"%s\"\n\0` ; \" is an escaped double-quote, so the output
-				;   is surrounded by real quote marks -- handy for
-				;   seeing arguments that contain spaces.
+        db `argv[%d] = \"%s\"\n\0`      ; \" is an escaped double-quote, so the output
+                                        ;   is surrounded by real quote marks -- handy for
+                                        ;   seeing arguments that contain spaces.
 
-section .bss			; zero-filled at load time, costs no file space
+section .bss                            ; zero-filled at load time, costs no file space
 argc:
-	resq 1			; one quadword to stash the incoming argc
+        resq 1                          ; one quadword to stash the incoming argc
 argv:
-	resq 1			; one quadword to stash the incoming argv pointer
+        resq 1                          ; one quadword to stash the incoming argv pointer
 
-extern printf			; defined in the C library, resolved by the linker
-global main			; export main for the C library start-up code
+extern printf                           ; defined in the C library, resolved by the linker
+global main                             ; export main for the C library start-up code
 
 section .text
 ;;; ----------------------------------------------------------------------------
@@ -104,68 +104,68 @@ section .text
 ;;;                 around each call.
 ;;; ----------------------------------------------------------------------------
 main:
-	push rbp		; prologue 1/2: save the caller's frame pointer.
-				;   `push` = rsp -= 8, then store at [rsp].
-	mov rbp, rsp		; prologue 2/2: rbp becomes the immovable anchor of
-				;   this frame.
-	and rsp, -16		; round rsp DOWN to a multiple of 16 by clearing
-				;   its low 4 bits (-16 == 0xFFFF...F0). Required
-				;   stack alignment before any `call`.
+        push rbp                        ; prologue 1/2: save the caller's frame pointer.
+                                        ;   `push` = rsp -= 8, then store at [rsp].
+        mov rbp, rsp                    ; prologue 2/2: rbp becomes the immovable anchor of
+                                        ;   this frame.
+        and rsp, -16                    ; round rsp DOWN to a multiple of 16 by clearing
+                                        ;   its low 4 bits (-16 == 0xFFFF...F0). Required
+                                        ;   stack alignment before any `call`.
 
-	mov qword [argc], rdi	; save argc into memory. Registers are scratch --
-				;   printf may overwrite rdi -- but .bss memory is
-				;   ours and survives every call.
-	mov qword [argv], rsi	; save argv likewise. `qword` = an 8-byte store.
+        mov qword [argc], rdi           ; save argc into memory. Registers are scratch --
+                                        ;   printf may overwrite rdi -- but .bss memory is
+                                        ;   ours and survives every call.
+        mov qword [argv], rsi           ; save argv likewise. `qword` = an 8-byte store.
 
-	mov rdi, fmt_argc	; printf argument 1: the format string's address
-	mov rsi, qword [argc]	; printf argument 2: the value of argc, reloaded
-				;   from memory. Note %d will print only its low
-				;   32 bits, which is correct for an int.
-	mov rax, 0		; variadic convention: 0 vector registers in use
-	call printf		; push return address, jump to printf
+        mov rdi, fmt_argc               ; printf argument 1: the format string's address
+        mov rsi, qword [argc]           ; printf argument 2: the value of argc, reloaded
+                                        ;   from memory. Note %d will print only its low
+                                        ;   32 bits, which is correct for an int.
+        mov rax, 0                      ; variadic convention: 0 vector registers in use
+        call printf                     ; push return address, jump to printf
 
-	mov rdi, fmt_executable	; argument 1: format string "Executable: %s\n"
-	mov rsi, qword [argv]	; argument 2, step 1: rsi = the address of the
-				;   argv ARRAY
-	mov rsi, qword [rsi]	; step 2: dereference it. [rsi] is the first
-				;   element of the array, i.e. argv[0] -- a pointer
-				;   to the executable's name. Now rsi points at
-				;   characters, which is what %s wants.
-	mov rax, 0		; no floating-point arguments
-	call printf
+        mov rdi, fmt_executable         ; argument 1: format string "Executable: %s\n"
+        mov rsi, qword [argv]           ; argument 2, step 1: rsi = the address of the
+                                        ;   argv ARRAY
+        mov rsi, qword [rsi]            ; step 2: dereference it. [rsi] is the first
+                                        ;   element of the array, i.e. argv[0] -- a pointer
+                                        ;   to the executable's name. Now rsi points at
+                                        ;   characters, which is what %s wants.
+        mov rax, 0                      ; no floating-point arguments
+        call printf
 
-	mov rsi, 1		; the loop counter j, starting at 1: argv[0] has
-				;   already been printed, so the interesting
-				;   arguments are argv[1] .. argv[argc-1].
-.L:				; top of the loop. '.'-prefixed => local to `main`.
-	cmp rsi, qword [argc]	; compare j against argc. `cmp` subtracts and keeps
-				;   only the flags.
-	je .done		; `je` = jump if equal (i.e. if the subtraction gave
-				;   zero). j reached argc, so the loop is finished.
-	mov rdi, fmt_command_line_arg ; argument 1: `argv[%d] = "%s"\n`
-	mov rdx, qword [argv]	; argument 3, step 1: address of the argv array
-	mov rdx, [rdx + 8*rsi]	; step 2: EFFECTIVE ADDRESS arithmetic. The CPU
-				;   computes base + 8*index for free inside the
-				;   addressing mode; 8 because each element is a
-				;   64-bit pointer. So rdx = argv[j], a char*.
-				;   (rsi is already argument 2, the index j -- it
-				;   was set before the loop and restored each pass.)
-	mov rax, 0		; no floating-point arguments
-	push rsi		; PROTECT the loop counter: rsi is caller-saved, so
-				;   printf may legally destroy it. Pushing also
-				;   flips the stack from 16-aligned to 8 mod 16 --
-				;   and the `call` below pushes 8 more, restoring
-				;   alignment at printf's first instruction.
-	call printf
-	pop rsi			; recover the loop counter (and re-align rsp)
-	inc rsi			; `inc` adds 1. Cheaper than `add rsi, 1` and, note,
-				;   it does NOT touch the carry flag.
-	jmp .L			; `jmp` is an unconditional jump: go round again
+        mov rsi, 1                      ; the loop counter j, starting at 1: argv[0] has
+                                        ;   already been printed, so the interesting
+                                        ;   arguments are argv[1] .. argv[argc-1].
+.L:                                     ; top of the loop. '.'-prefixed => local to `main`.
+        cmp rsi, qword [argc]           ; compare j against argc. `cmp` subtracts and keeps
+                                        ;   only the flags.
+        je .done                        ; `je` = jump if equal (i.e. if the subtraction gave
+                                        ;   zero). j reached argc, so the loop is finished.
+        mov rdi, fmt_command_line_arg   ; argument 1: `argv[%d] = "%s"\n`
+        mov rdx, qword [argv]           ; argument 3, step 1: address of the argv array
+        mov rdx, [rdx + 8*rsi]          ; step 2: EFFECTIVE ADDRESS arithmetic. The CPU
+                                        ;   computes base + 8*index for free inside the
+                                        ;   addressing mode; 8 because each element is a
+                                        ;   64-bit pointer. So rdx = argv[j], a char*.
+                                        ;   (rsi is already argument 2, the index j -- it
+                                        ;   was set before the loop and restored each pass.)
+        mov rax, 0                      ; no floating-point arguments
+        push rsi                        ; PROTECT the loop counter: rsi is caller-saved, so
+                                        ;   printf may legally destroy it. Pushing also
+                                        ;   flips the stack from 16-aligned to 8 mod 16 --
+                                        ;   and the `call` below pushes 8 more, restoring
+                                        ;   alignment at printf's first instruction.
+        call printf
+        pop rsi                         ; recover the loop counter (and re-align rsp)
+        inc rsi                         ; `inc` adds 1. Cheaper than `add rsi, 1` and, note,
+                                        ;   it does NOT touch the carry flag.
+        jmp .L                          ; `jmp` is an unconditional jump: go round again
 
 .done:
-	mov rax, 0		; main's return value: 0 = success
-	mov rsp, rbp		; epilogue 1/2: undo all our stack changes at once
-	pop rbp			; epilogue 2/2: restore the caller's frame pointer
-	ret			; pop the return address into rip
+        mov rax, 0                      ; main's return value: 0 = success
+        mov rsp, rbp                    ; epilogue 1/2: undo all our stack changes at once
+        pop rbp                         ; epilogue 2/2: restore the caller's frame pointer
+        ret                             ; pop the return address into rip
 
-section .note.GNU-stack noalloc noexec ; required Linux marker: no executable stack
+section .note.GNU-stack noalloc noexec  ; required Linux marker: no executable stack

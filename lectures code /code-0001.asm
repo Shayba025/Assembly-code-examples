@@ -64,39 +64,39 @@
 ;;;   address into the C library, and it is the only thing `ret` needs.
 ;;; ============================================================================
 
-section .data			; `.data` = initialised, writable memory. Anything
-				;   you spell out here occupies real bytes in the
-				;   executable file.
-fmt_prompt_for_input:		; label = the address of the bytes that follow
-	db `Enter two integers, a, b: \0`
-				; `db` ("define byte") emits raw bytes. NASM's
-				;   BACKQUOTED string is the only kind that expands
-				;   escapes, so \0 really becomes byte 0 -- the NUL
-				;   terminator every C string must end with.
+section .data                           ; `.data` = initialised, writable memory. Anything
+                                        ;   you spell out here occupies real bytes in the
+                                        ;   executable file.
+fmt_prompt_for_input:                   ; label = the address of the bytes that follow
+        db `Enter two integers, a, b: \0`
+                                        ; `db` ("define byte") emits raw bytes. NASM's
+                                        ;   BACKQUOTED string is the only kind that expands
+                                        ;   escapes, so \0 really becomes byte 0 -- the NUL
+                                        ;   terminator every C string must end with.
 fmt_input:
-	db `%ld, %ld\0`		; scanf's format: two `long` decimals separated by
-				;   a comma and optional space. %ld = 64-bit signed.
+        db `%ld, %ld\0`                 ; scanf's format: two `long` decimals separated by
+                                        ;   a comma and optional space. %ld = 64-bit signed.
 fmt_output:
-	db `The max value is %ld\n\0` ; printf's format. \n = newline (byte 10).
+        db `The max value is %ld\n\0`   ; printf's format. \n = newline (byte 10).
 
-section .bss			; `.bss` = zero-initialised, writable memory. It
-				;   costs NO space in the file on disk; the loader
-				;   just zeroes it at start-up. Use it for
-				;   variables whose initial value you don't care
-				;   about.
+section .bss                            ; `.bss` = zero-initialised, writable memory. It
+                                        ;   costs NO space in the file on disk; the loader
+                                        ;   just zeroes it at start-up. Use it for
+                                        ;   variables whose initial value you don't care
+                                        ;   about.
 a:
-	resq 1			; `resq n` RESERVES n quadwords (n * 8 bytes).
-				;   So `a` is one 64-bit slot.
+        resq 1                          ; `resq n` RESERVES n quadwords (n * 8 bytes).
+                                        ;   So `a` is one 64-bit slot.
 b:
-	resq 1			; likewise `b`.
+        resq 1                          ; likewise `b`.
 
-extern printf, scanf		; `extern` declares symbols defined ELSEWHERE
-				;   (here: in the C library). It generates no code;
-				;   it just stops NASM complaining and leaves the
-				;   linker to fill in the real addresses.
-global main			; export `main` so the C library start-up can call it
+extern printf, scanf                    ; `extern` declares symbols defined ELSEWHERE
+                                        ;   (here: in the C library). It generates no code;
+                                        ;   it just stops NASM complaining and leaves the
+                                        ;   linker to fill in the real addresses.
+global main                             ; export `main` so the C library start-up can call it
 
-section .text			; back to the executable-code section
+section .text                           ; back to the executable-code section
 ;;; ----------------------------------------------------------------------------
 ;;; main -- prompt, read two longs, print the maximum.
 ;;;   C signature : int main(void)
@@ -107,75 +107,75 @@ section .text			; back to the executable-code section
 ;;;                 compare-and-conditional-jump.
 ;;; ----------------------------------------------------------------------------
 main:
-	push rbp		; `push src` = subtract 8 from rsp, then store src
-				;   at [rsp]. This SAVES the caller's frame pointer,
-				;   because rbp is callee-saved: we must give it
-				;   back unchanged. First half of the prologue.
-	mov rbp, rsp		; copy the current stack top into rbp, making rbp
-				;   the fixed ANCHOR of our frame. From now on every
-				;   local can be addressed as [rbp - k], which never
-				;   shifts even as rsp moves.
-	and rsp, -16		; `and dst, src` = bitwise AND. -16 is 0xFFFF...F0,
-				;   i.e. all ones except the low 4 bits, so this
-				;   clears the low 4 bits of rsp: it rounds rsp DOWN
-				;   to a multiple of 16. The ABI requires 16-byte
-				;   stack alignment at every `call`; SSE
-				;   instructions inside printf will fault otherwise.
+        push rbp                        ; `push src` = subtract 8 from rsp, then store src
+                                        ;   at [rsp]. This SAVES the caller's frame pointer,
+                                        ;   because rbp is callee-saved: we must give it
+                                        ;   back unchanged. First half of the prologue.
+        mov rbp, rsp                    ; copy the current stack top into rbp, making rbp
+                                        ;   the fixed ANCHOR of our frame. From now on every
+                                        ;   local can be addressed as [rbp - k], which never
+                                        ;   shifts even as rsp moves.
+        and rsp, -16                    ; `and dst, src` = bitwise AND. -16 is 0xFFFF...F0,
+                                        ;   i.e. all ones except the low 4 bits, so this
+                                        ;   clears the low 4 bits of rsp: it rounds rsp DOWN
+                                        ;   to a multiple of 16. The ABI requires 16-byte
+                                        ;   stack alignment at every `call`; SSE
+                                        ;   instructions inside printf will fault otherwise.
 
-	; printf(fmt_prompt_for_input)
-	mov rdi, fmt_prompt_for_input ; 1st argument goes in rdi. A bare label used
-				      ;   as a value is its ADDRESS, so this loads a
-				      ;   pointer to the string, not the string.
-	mov rax, 0		      ; variadic rule: rax = how many vector (xmm)
-				      ;   registers carry arguments. Zero floats here.
-	call printf		      ; `call` pushes the address of the NEXT
-				      ;   instruction (the return address) and jumps.
-				      ;   That push is why the stack had to be
-				      ;   aligned first.
+                                        ; printf(fmt_prompt_for_input)
+        mov rdi, fmt_prompt_for_input   ; 1st argument goes in rdi. A bare label used
+                                        ;   as a value is its ADDRESS, so this loads a
+                                        ;   pointer to the string, not the string.
+        mov rax, 0                      ; variadic rule: rax = how many vector (xmm)
+                                        ;   registers carry arguments. Zero floats here.
+        call printf                     ; `call` pushes the address of the NEXT
+                                        ;   instruction (the return address) and jumps.
+                                        ;   That push is why the stack had to be
+                                        ;   aligned first.
 
-	; scanf(fmt_input, &a, &b)
-	mov rdi, fmt_input	; 1st argument: the format string
-	mov rsi, a		; 2nd argument: the ADDRESS of a. scanf must be
-				;   able to write into it, so it needs a pointer --
-				;   this is `&a` in C.
-	mov rdx, b		; 3rd argument: the address of b
-	mov rax, 0		; again: no floating-point arguments
-	call scanf		; reads from stdin and stores into [a] and [b]
+                                        ; scanf(fmt_input, &a, &b)
+        mov rdi, fmt_input              ; 1st argument: the format string
+        mov rsi, a                      ; 2nd argument: the ADDRESS of a. scanf must be
+                                        ;   able to write into it, so it needs a pointer --
+                                        ;   this is `&a` in C.
+        mov rdx, b                      ; 3rd argument: the address of b
+        mov rax, 0                      ; again: no floating-point arguments
+        call scanf                      ; reads from stdin and stores into [a] and [b]
 
-	; printf(fmt_output, (a > b) ? a : b)
-	mov rdi, fmt_output	; 1st argument: the output format string
-	mov rsi, qword [a]	; SQUARE BRACKETS mean "the contents of that
-				;   address". Without them we would load the
-				;   address itself. `qword` tells NASM the access
-				;   is 8 bytes wide. So: rsi = a. We optimistically
-				;   assume a is the maximum.
-	mov rax, qword [b]	; rax = b, used here purely as a scratch register
-	cmp rsi, rax		; `cmp x, y` computes x - y and THROWS THE RESULT
-				;   AWAY, keeping only the flags. It is a subtract
-				;   whose only product is "how do these compare".
-	jg .continue		; `jg` = jump if greater (signed). It reads the
-				;   flags cmp just set. If a > b our guess was
-				;   right, so skip the fix-up.
-	mov rsi, rax		; we get here only when a <= b, so b is the max:
-				;   overwrite the argument register with b.
-.continue:			; a label starting with '.' is LOCAL: it belongs to
-				;   the preceding non-local label (`main`), so other
-				;   functions may reuse the name `.continue`.
-	mov rax, 0		; no floating-point arguments to printf
-	call printf		; prints "The max value is <n>"
+                                        ; printf(fmt_output, (a > b) ? a : b)
+        mov rdi, fmt_output             ; 1st argument: the output format string
+        mov rsi, qword [a]              ; SQUARE BRACKETS mean "the contents of that
+                                        ;   address". Without them we would load the
+                                        ;   address itself. `qword` tells NASM the access
+                                        ;   is 8 bytes wide. So: rsi = a. We optimistically
+                                        ;   assume a is the maximum.
+        mov rax, qword [b]              ; rax = b, used here purely as a scratch register
+        cmp rsi, rax                    ; `cmp x, y` computes x - y and THROWS THE RESULT
+                                        ;   AWAY, keeping only the flags. It is a subtract
+                                        ;   whose only product is "how do these compare".
+        jg .continue                    ; `jg` = jump if greater (signed). It reads the
+                                        ;   flags cmp just set. If a > b our guess was
+                                        ;   right, so skip the fix-up.
+        mov rsi, rax                    ; we get here only when a <= b, so b is the max:
+                                        ;   overwrite the argument register with b.
+.continue:                              ; a label starting with '.' is LOCAL: it belongs to
+                                        ;   the preceding non-local label (`main`), so other
+                                        ;   functions may reuse the name `.continue`.
+        mov rax, 0                      ; no floating-point arguments to printf
+        call printf                     ; prints "The max value is <n>"
 
-	mov rax, 0		; the value main returns to the C library, which
-				;   passes it to the shell as the exit status.
-				;   0 = success by universal convention.
+        mov rax, 0                      ; the value main returns to the C library, which
+                                        ;   passes it to the shell as the exit status.
+                                        ;   0 = success by universal convention.
 
-	mov rsp, rbp		; EPILOGUE, step 1: throw away everything this
-				;   frame did to rsp (including the alignment) by
-				;   restoring it from the anchor.
-	pop rbp			; step 2: `pop dst` loads [rsp] into dst and adds 8
-				;   to rsp. This restores the CALLER's frame pointer
-				;   that we pushed on entry.
-	ret			; pop the return address into rip -- back into the
-				;   C library, which will call exit(rax).
+        mov rsp, rbp                    ; EPILOGUE, step 1: throw away everything this
+                                        ;   frame did to rsp (including the alignment) by
+                                        ;   restoring it from the anchor.
+        pop rbp                         ; step 2: `pop dst` loads [rsp] into dst and adds 8
+                                        ;   to rsp. This restores the CALLER's frame pointer
+                                        ;   that we pushed on entry.
+        ret                             ; pop the return address into rip -- back into the
+                                        ;   C library, which will call exit(rax).
 
-section .note.GNU-stack noalloc noexec ; "this program does not need an executable
-				;   stack" -- required boilerplate on Linux.
+section .note.GNU-stack noalloc noexec  ; "this program does not need an executable
+                                        ;   stack" -- required boilerplate on Linux.

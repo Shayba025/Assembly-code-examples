@@ -57,29 +57,29 @@
 ;;;   How it works: sets the return register and returns immediately.
 ;;; ----------------------------------------------------------------------------
 
-global main			; `global` EXPORTS a symbol from this file so the
-				;   linker can find it from other object files.
-				;   Without it, `main` would be file-local and the
-				;   C library would have nothing to call.
-section .text			; `section` selects which part of the output file
-				;   the following lines go into. `.text` is the
-				;   read-only, executable section: machine code.
-main:				; a LABEL: a name for "the address of the next
-				;   thing emitted". Costs zero bytes; it is just a
-				;   name the assembler remembers.
-	mov rax, 0		; `mov dst, src` copies src into dst (it does NOT
-				;   move -- the source is unchanged). Here we put
-				;   the 64-bit constant 0 into rax. By the System V
-				;   calling convention rax holds a function's return
-				;   value, so this is literally `return 0;`.
-	ret			; `ret` pops the 8-byte return address off the top
-				;   of the stack into rip, so execution resumes in
-				;   the caller. Equivalent to `pop rip`.
+global main                             ; `global` EXPORTS a symbol from this file so the
+                                        ;   linker can find it from other object files.
+                                        ;   Without it, `main` would be file-local and the
+                                        ;   C library would have nothing to call.
+section .text                           ; `section` selects which part of the output file
+                                        ;   the following lines go into. `.text` is the
+                                        ;   read-only, executable section: machine code.
+main:                                   ; a LABEL: a name for "the address of the next
+                                        ;   thing emitted". Costs zero bytes; it is just a
+                                        ;   name the assembler remembers.
+        mov rax, 0                      ; `mov dst, src` copies src into dst (it does NOT
+                                        ;   move -- the source is unchanged). Here we put
+                                        ;   the 64-bit constant 0 into rax. By the System V
+                                        ;   calling convention rax holds a function's return
+                                        ;   value, so this is literally `return 0;`.
+        ret                             ; `ret` pops the 8-byte return address off the top
+                                        ;   of the stack into rip, so execution resumes in
+                                        ;   the caller. Equivalent to `pop rip`.
 
-section .note.GNU-stack noalloc noexec ; A marker section carrying no code and no
-				;   data. It tells the Linux loader "this program
-				;   does NOT need an executable stack", which is a
-				;   security requirement on modern systems. `noalloc`
-				;   = takes up no memory at run time, `noexec` = not
-				;   executable. Every file in this course ends with
-				;   this line; without it the linker warns.
+section .note.GNU-stack noalloc noexec  ; A marker section carrying no code and no
+                                        ;   data. It tells the Linux loader "this program
+                                        ;   does NOT need an executable stack", which is a
+                                        ;   security requirement on modern systems. `noalloc`
+                                        ;   = takes up no memory at run time, `noexec` = not
+                                        ;   executable. Every file in this course ends with
+                                        ;   this line; without it the linker warns.

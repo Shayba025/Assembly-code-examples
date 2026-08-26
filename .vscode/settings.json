@@ -1,0 +1,13 @@
+{
+	"files.associations": {
+		"*.asm": "asm-intel-x86-generic"
+	},
+	"[asm-intel-x86-generic]": {
+		"editor.insertSpaces": true,
+		"editor.tabSize": 8,
+		"editor.detectIndentation": false
+	},
+	"files.exclude": {
+		"**/*.o": true
+	}
+}
