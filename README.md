@@ -64,11 +64,19 @@ them (`objdump`, `nm`, `ls -l`) if you want to.
 ./debug "lectures code /code-0004.asm" 3
 ```
 
-gdb opens **already stopped at the first instruction of `main`**, with Intel
-syntax and a live register window. The commands you will use most:
+gdb opens **already stopped at the first instruction of `main`** and prints a
+cheat sheet. Type **`cheat`** at any time to see it again.
+
+gdb is a prompt: you type a command and press Enter. If you ever see
+`--Type <RET> for more--`, that means "press the Enter key" — but this setup
+turns paging off, so you should not.
+
+The commands you will use most:
 
 | command | what it does |
 |---|---|
+| `cheat` | print the cheat sheet again |
+| `regs` | the registers this course cares about |
 | `si` / `ni` | step one instruction (`si` follows `call`, `ni` steps over it) |
 | `bt` | backtrace — the chain of unfinished calls |
 | `finish` | run the current function to completion and come back |
@@ -115,20 +123,37 @@ is already configured.
 | **asm: clean build artifacts** | delete every generated `.o` and executable |
 | **asm: rebuild the Docker toolchain** | after editing the `Dockerfile` |
 
-### With one extension — real breakpoints in the editor
+### Real breakpoints in the editor — F5
 
-Install **C/C++** (`ms-vscode.cpptools`); VS Code will offer it, since
-`.vscode/extensions.json` recommends it. Then open any `.asm` file, click in the
-gutter to set a breakpoint, and press **F5**.
+Requires the **C/C++** extension (`ms-vscode.cpptools`). Then:
+
+1. Open any `.asm` file.
+2. Click in the gutter to set a breakpoint (optional — F5 stops at `main`
+   anyway).
+3. Press **F5**.
+
+You get the normal VS Code debug UI — step buttons, breakpoints, call stack,
+and a Registers view — driving x86-64 code on an arm64 Mac.
 
 What happens under the hood: a task builds the file and starts it inside the
-container paused under a qemu gdb-stub; VS Code runs `gdb-multiarch` *in the
-same container* over a pipe and attaches to it. You get the normal debug UI —
-step, breakpoints, and a Registers view — on x86-64 code, on an arm64 Mac.
+container, paused under a qemu gdb-stub; VS Code then runs `gdb-multiarch` *in
+that same container* over a pipe and attaches to it.
 
-Program output appears in the **asm: program output** task (`Terminal ▸ Run
-Task… ▸ asm: program output`), because the program runs detached in the
-container.
+**Program arguments**: F5 prompts for them. Press Enter for none.
+
+**Program output** appears in the **asm: program output** task
+(`Terminal ▸ Run Task… ▸ asm: program output`), not in the Debug Console,
+because the program runs detached in the container.
+
+**Program input**: put it in a file named `<name>.stdin` beside `<name>.asm` and
+it is fed in automatically. One is included for `code-0001`:
+
+```bash
+cat "lectures code /code-0001.stdin"    # 3, 9
+```
+
+Delete or edit that file to change what the program reads. (`./debug` in a
+terminal lets you type input live instead.)
 
 ---
 

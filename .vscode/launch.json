@@ -12,25 +12,36 @@
 			"cwd": "/work",
 			"stopAtEntry": true,
 			"MIMode": "gdb",
+			"externalConsole": false,
 
 			// Build the file and start a paused qemu gdb-stub, then tear it down.
 			"preLaunchTask": "asm: start debug server",
 			"postDebugTask": "asm: stop debug server",
 
 			// Run gdb-multiarch inside the container and speak MI to it over a
-			// pipe. Nothing x86-specific needs to be installed on the Mac.
+			// pipe. `${debuggerCommand}` is substituted by cpptools with
+			// "/usr/bin/gdb-multiarch --interpreter=mi"; `sh -c` is what gives
+			// it something to execute. Nothing x86-specific is needed on the Mac.
 			"pipeTransport": {
 				"pipeProgram": "/usr/local/bin/docker",
-				"pipeArgs": ["exec", "-i", "asm-dbg"],
+				"pipeArgs": [
+					"exec",
+					"-i",
+					"asm-dbg",
+					"sh",
+					"-c",
+					"${debuggerCommand}"
+				],
 				"debuggerPath": "/usr/bin/gdb-multiarch",
-				"pipeCwd": "${workspaceFolder}"
+				"pipeCwd": "${workspaceFolder}",
+				"quoteArgs": false
 			},
 
 			// The gdb stub qemu-user opened for the program.
 			"miDebuggerServerAddress": "localhost:1234",
 
-			// Map the container's /work back to the folder on the Mac, so that
-			// breakpoints set in the editor land on the right source lines.
+			// Map the container's /work back to the folder on the Mac, so the
+			// editor highlights the right line as you step.
 			"sourceFileMap": {
 				"/work": "${fileDirname}"
 			},
@@ -38,12 +49,12 @@
 			"setupCommands": [
 				{
 					"description": "the target is x86-64 even though the Mac is arm64",
-					"text": "set architecture i386:x86-64",
+					"text": "-gdb-set architecture i386:x86-64",
 					"ignoreFailures": false
 				},
 				{
 					"description": "Intel syntax, like NASM",
-					"text": "set disassembly-flavor intel",
+					"text": "-gdb-set disassembly-flavor intel",
 					"ignoreFailures": true
 				},
 				{

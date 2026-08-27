@@ -1,18 +1,12 @@
 #!/usr/bin/env bash
 # Assemble, link and DEBUG one of the course's x86-64 Linux NASM programs in gdb.
 #
-#     ./debug "lectures code /code-0004.asm" 3
+#     ./debug "lectures code /code-0001.asm"
+#     ./debug "lectures code /code-0004.asm" 3        # with arguments
+#     echo "3, 9" | ./debug "lectures code /code-0001.asm"   # with input
 #
-# gdb starts already stopped at the first instruction of `main`, with Intel
-# syntax and a live register window. Useful commands once you are there:
-#
-#     layout regs    split view: registers on top, source below
-#     si / ni        step one instruction (si follows `call`, ni steps over it)
-#     bt             backtrace -- the chain of unfinished calls
-#     info frame     the current stack frame: return address, saved rbp
-#     x/8gx $rsp     dump the top 8 quadwords of the stack
-#     p $rax         print a register
-#     c              continue,  q  quit
+# gdb opens already stopped at the first instruction of `main` and prints a
+# cheat sheet. Type `cheat` at any time to see it again.
 set -euo pipefail
 
 if [ $# -lt 1 ]; then
@@ -26,25 +20,87 @@ base="$(basename "$src" .asm)"
 
 docker run --rm -it -v "$dir:/work" -w /work asm-course \
 	bash -c 'set -e
-		nasm -f elf64 -g -F dwarf "$1.asm" -o "$1.o"
-		if grep -qE "^[[:space:]]*global[[:space:]]+_start" "$1.asm"; then
+		prog="$1"; shift
+
+		nasm -f elf64 -g -F dwarf "$prog.asm" -o "$prog.o"
+		if grep -qE "^[[:space:]]*global[[:space:]]+_start" "$prog.asm"; then
 			# the program defines _start, so it is a freestanding
 			# executable: link it WITHOUT the C library
-			x86_64-linux-gnu-ld -z noexecstack -o "$1" "$1.o"
-		elif [ -f "$1_test.c" ]; then
-			# the .asm has no main() of its own: link the C driver next to it
-			x86_64-linux-gnu-gcc -no-pie -g -Wl,-z,noexecstack -o "$1" "$1_test.c" "$1.o" -lm
+			x86_64-linux-gnu-ld -z noexecstack -o "$prog" "$prog.o"
+			entry=_start
 		else
-			x86_64-linux-gnu-gcc -no-pie -Wl,-z,noexecstack -o "$1" "$1.o" -lm
+			if [ -f "${prog}_test.c" ]; then
+				# no main() of its own: link the C driver beside it
+				x86_64-linux-gnu-gcc -no-pie -g -Wl,-z,noexecstack \
+					-o "$prog" "${prog}_test.c" "$prog.o" -lm
+			else
+				x86_64-linux-gnu-gcc -no-pie -Wl,-z,noexecstack \
+					-o "$prog" "$prog.o" -lm
+			fi
+			entry=main
 		fi
-		prog="$1"; shift
+
+		# --- the gdb start-up script -------------------------------------
+		cat > /tmp/asmrc.gdb <<GDBRC
+set confirm off
+set pagination off
+set disassembly-flavor intel
+set architecture i386:x86-64
+set print pretty on
+
+define cheat
+echo \\n
+echo  ===================  gdb cheat sheet  ===================\\n
+echo \\n
+echo  STEPPING\\n
+echo    si          step ONE instruction (follows a call)\\n
+echo    ni          step one instruction (steps OVER a call)\\n
+echo    finish      run the current function to its end\\n
+echo    c           continue to the next breakpoint or the end\\n
+echo    q           quit\\n
+echo \\n
+echo  LOOKING AT REGISTERS\\n
+echo    p \$rax          one register, in decimal\\n
+echo    p/x \$rax        ...in hex        p/t \$rax   ...in binary\\n
+echo    info registers  all of them\\n
+echo    regs            the ones this course cares about\\n
+echo \\n
+echo  LOOKING AT MEMORY\\n
+echo    x/s \$rdi        the string a pointer points at\\n
+echo    x/8gx \$rsp      8 quadwords of stack, in hex\\n
+echo    x/1gd &a        one variable, by name, in decimal\\n
+echo \\n
+echo  THE CALL STACK\\n
+echo    bt              who called whom (frame 0 is where you are)\\n
+echo    info frame      return address and saved rbp of this frame\\n
+echo    up / down       move between frames\\n
+echo \\n
+echo  BREAKPOINTS\\n
+echo    break printf            stop whenever printf is called\\n
+echo    break $prog.asm:57      stop at line 57 of this file\\n
+echo    info breakpoints        list them\\n
+echo \\n
+echo  SEEING WHERE YOU ARE\\n
+echo    l               show source around the current line\\n
+echo    x/5i \$pc        the next 5 machine instructions\\n
+echo    layout regs     split screen: registers + source\\n
+echo                    (Ctrl-X then A turns the split screen off again)\\n
+echo \\n
+echo  Type  cheat  to see this again.\\n
+echo \\n
+end
+
+define regs
+info registers rax rbx rcx rdx rsi rdi rbp rsp
+end
+
+file ./$prog
+target remote :1234
+break $entry
+continue
+cheat
+GDBRC
+
 		qemu-x86_64 -L /usr/x86_64-linux-gnu -g 1234 "./$prog" "$@" &
 		sleep 0.7
-		exec gdb-multiarch -q \
-		     -ex "set confirm off" \
-		     -ex "set disassembly-flavor intel" \
-		     -ex "set architecture i386:x86-64" \
-		     -ex "file ./'"$base"'" \
-		     -ex "target remote :1234" \
-		     -ex "break main" \
-		     -ex "continue"' _ "$base" "$@"
+		exec gdb-multiarch -q -x /tmp/asmrc.gdb' _ "$base" "$@"
