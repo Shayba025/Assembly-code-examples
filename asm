@@ -21,6 +21,15 @@ if [ -t 0 ]; then tty=(-it); else tty=(-i); fi
 docker run --rm "${tty[@]}" -v "$dir:/work" -w /work asm-course \
 	bash -c 'set -e
 		nasm -f elf64 -g -F dwarf "$1.asm" -o "$1.o"
-		x86_64-linux-gnu-gcc -no-pie -o "$1" "$1.o"
+		if grep -qE "^[[:space:]]*global[[:space:]]+_start" "$1.asm"; then
+			# the program defines _start, so it is a freestanding
+			# executable: link it WITHOUT the C library
+			x86_64-linux-gnu-ld -z noexecstack -o "$1" "$1.o"
+		elif [ -f "$1_test.c" ]; then
+			# the .asm has no main() of its own: link the C driver next to it
+			x86_64-linux-gnu-gcc -no-pie -g -Wl,-z,noexecstack -o "$1" "$1_test.c" "$1.o" -lm
+		else
+			x86_64-linux-gnu-gcc -no-pie -Wl,-z,noexecstack -o "$1" "$1.o" -lm
+		fi
 		prog="$1"; shift
 		exec qemu-x86_64 -L /usr/x86_64-linux-gnu "./$prog" "$@"' _ "$base" "$@"
