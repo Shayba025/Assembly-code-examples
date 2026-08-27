@@ -123,14 +123,27 @@ is already configured.
 | **asm: clean build artifacts** | delete every generated `.o` and executable |
 | **asm: rebuild the Docker toolchain** | after editing the `Dockerfile` |
 
-### Real breakpoints in the editor — F5
+### Real breakpoints in the editor — the play button
 
 Requires the **C/C++** extension (`ms-vscode.cpptools`). Then:
 
 1. Open any `.asm` file.
-2. Click in the gutter to set a breakpoint (optional — F5 stops at `main`
+2. Click in the gutter to set a breakpoint (optional — it stops at `main`
    anyway).
-3. Press **F5**.
+3. Click the **Run and Debug** icon in the left activity bar (▷ with a bug), or
+   press **⇧⌘D**, then click the green **▶** at the top.
+
+**On macOS, do not use F5/F10/F11** — the system claims them for VoiceOver and
+Mission Control. Either hold **fn** with them, or use the mouse, or use these
+shortcuts (already added to your VS Code keybindings):
+
+| shortcut | action |
+|---|---|
+| **⌃⌥R** | start / continue |
+| **⌃⌥I** | step into |
+| **⌃⌥O** | step over |
+| **⌃⌥U** | step out |
+| **⌃⌥Q** | stop |
 
 You get the normal VS Code debug UI — step buttons, breakpoints, call stack,
 and a Registers view — driving x86-64 code on an arm64 Mac.

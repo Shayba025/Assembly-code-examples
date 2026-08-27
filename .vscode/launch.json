@@ -2,6 +2,7 @@
 	"version": "0.2.0",
 	"configurations": [
 		{
+			
 			"name": "Debug this .asm  (F5)",
 			"type": "cppdbg",
 			"request": "launch",
@@ -12,25 +13,27 @@
 			"cwd": "/work",
 			"stopAtEntry": true,
 			"MIMode": "gdb",
+			"targetArchitecture": "x86_64",
 			"externalConsole": false,
+
+			// qemu has already created and paused the process at its gdb stub.
+			// Continue that process after attaching; `exec-run` would try to
+			// restart it and makes the initial breakpoints inaccessible.
+			"launchCompleteCommand": "exec-continue",
 
 			// Build the file and start a paused qemu gdb-stub, then tear it down.
 			"preLaunchTask": "asm: start debug server",
 			"postDebugTask": "asm: stop debug server",
 
 			// Run gdb-multiarch inside the container and speak MI to it over a
-			// pipe. `${debuggerCommand}` is substituted by cpptools with
-			// "/usr/bin/gdb-multiarch --interpreter=mi"; `sh -c` is what gives
-			// it something to execute. Nothing x86-specific is needed on the Mac.
+			// pipe. cpptools appends debuggerPath (and its MI arguments) to this
+			// docker command. Nothing x86-specific is needed on the Mac.
 			"pipeTransport": {
 				"pipeProgram": "/usr/local/bin/docker",
 				"pipeArgs": [
 					"exec",
 					"-i",
-					"asm-dbg",
-					"sh",
-					"-c",
-					"${debuggerCommand}"
+					"asm-dbg"
 				],
 				"debuggerPath": "/usr/bin/gdb-multiarch",
 				"pipeCwd": "${workspaceFolder}",
@@ -39,6 +42,20 @@
 
 			// The gdb stub qemu-user opened for the program.
 			"miDebuggerServerAddress": "localhost:1234",
+			// This cpptools build does not issue target-select automatically when
+			// pipeTransport is used, so explicitly attach GDB to qemu's stub.
+			"customLaunchSetupCommands": [
+				{
+					"description": "connect to qemu's gdb stub",
+					"text": "-target-select remote localhost:1234",
+					"ignoreFailures": false
+				},
+				{
+					"description": "stop automatically at the first instruction of main",
+					"text": "-break-insert -f main",
+					"ignoreFailures": false
+				}
+			],
 
 			// Map the container's /work back to the folder on the Mac, so the
 			// editor highlights the right line as you step.
