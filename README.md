@@ -47,6 +47,23 @@ To check it worked:
 
 ## 3. Everyday use
 
+### Just build an executable
+
+```bash
+./build "lectures code /code-0003.asm"
+```
+
+Leaves two files next to the `.asm`:
+
+| file | what it is |
+|---|---|
+| `code-0003.o` | the object file, from `nasm` |
+| `code-0003` | the executable, from the linker |
+
+It is a **Linux x86-64** binary, so macOS cannot run it directly — use `./asm`,
+which builds and runs in one step. In VS Code: `Terminal ▸ Run Task… ▸
+asm: build current file (executable only)`.
+
 ### Run a program
 
 ```bash

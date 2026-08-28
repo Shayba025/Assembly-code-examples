@@ -40,12 +40,12 @@ echo "==> starting debug server for $base $prog_args"
 if [ -f "$dir/$base.stdin" ]; then
 	echo "==> feeding $base.stdin to the program's standard input"
 	# shellcheck disable=SC2086  -- word splitting of prog_args is intentional
-	docker run -d -i --name asm-dbg -v "$dir:/work" -w /work asm-course \
+	docker run -d -i --name asm-dbg -p 1234:1234 -v "$dir:/work" -w /work asm-course \
 		bash -c "exec qemu-x86_64 -L /usr/x86_64-linux-gnu -g 1234 \
 			'./$base' $prog_args < '$base.stdin'" >/dev/null
 else
 	# shellcheck disable=SC2086
-	docker run -d -i --name asm-dbg -v "$dir:/work" -w /work asm-course \
+	docker run -d -i --name asm-dbg -p 1234:1234 -v "$dir:/work" -w /work asm-course \
 		qemu-x86_64 -L /usr/x86_64-linux-gnu -g 1234 "./$base" $prog_args >/dev/null
 fi
 

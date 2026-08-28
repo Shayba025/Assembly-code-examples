@@ -2,84 +2,86 @@
 	"version": "0.2.0",
 	"configurations": [
 		{
-			
-			"name": "Debug this .asm  (F5)",
+			"name": "Debug this .asm",
 			"type": "cppdbg",
 			"request": "launch",
 
-			// `program` is the path INSIDE the container, because the debugger
-			// itself runs there (see pipeTransport below).
+			// Symbols. This is a path INSIDE the container, where gdb runs.
 			"program": "/work/${fileBasenameNoExtension}",
 			"cwd": "/work",
-			"stopAtEntry": true,
 			"MIMode": "gdb",
+			// cpptools cannot reliably auto-detect this through the Docker/QEMU
+			// pipe on Apple Silicon. This is the debuggee architecture, not macOS.
 			"targetArchitecture": "x86_64",
+			"stopAtEntry": true,
 			"externalConsole": false,
 
-			// qemu has already created and paused the process at its gdb stub.
-			// Continue that process after attaching; `exec-run` would try to
-			// restart it and makes the initial breakpoints inaccessible.
-			"launchCompleteCommand": "exec-continue",
-
-			// Build the file and start a paused qemu gdb-stub, then tear it down.
 			"preLaunchTask": "asm: start debug server",
 			"postDebugTask": "asm: stop debug server",
 
-			// Run gdb-multiarch inside the container and speak MI to it over a
-			// pipe. cpptools appends debuggerPath (and its MI arguments) to this
-			// docker command. Nothing x86-specific is needed on the Mac.
+			// gdb runs INSIDE the container; gdbpipe.sh connects us to it.
 			"pipeTransport": {
-				"pipeProgram": "/usr/local/bin/docker",
-				"pipeArgs": [
-					"exec",
-					"-i",
-					"asm-dbg"
-				],
+				"pipeProgram": "${workspaceFolder}/.vscode/gdbpipe.sh",
+				"pipeArgs": [],
 				"debuggerPath": "/usr/bin/gdb-multiarch",
-				"pipeCwd": "${workspaceFolder}",
-				"quoteArgs": false
+				"pipeCwd": "${workspaceFolder}"
 			},
 
-			// The gdb stub qemu-user opened for the program.
-			"miDebuggerServerAddress": "localhost:1234",
-			// This cpptools build does not issue target-select automatically when
-			// pipeTransport is used, so explicitly attach GDB to qemu's stub.
+			// THE IMPORTANT PART. By default the extension finishes by issuing
+			// `-exec-run`, i.e. "gdb, start this program yourself". That cannot
+			// work here: the program is x86-64 and already running under qemu,
+			// and `miDebuggerServerAddress` is IGNORED when pipeTransport is
+			// used (they are two different remote strategies, not one).
+			//
+			// So we replace the launch commands with an explicit connect to
+			// qemu's gdb stub, and finish with `exec-continue` instead of
+			// `exec-run` -- the program is already live, it just needs releasing.
 			"customLaunchSetupCommands": [
 				{
-					"description": "connect to qemu's gdb stub",
-					"text": "-target-select remote localhost:1234",
+					"text": "-environment-cd /work",
+					"description": "work where the sources are",
 					"ignoreFailures": false
 				},
 				{
-					"description": "stop automatically at the first instruction of main",
-					"text": "-break-insert -f main",
+					"text": "-file-exec-and-symbols /work/${fileBasenameNoExtension}",
+					"description": "load the program's symbols",
+					"ignoreFailures": false
+				},
+				{
+					"text": "-target-select remote localhost:1234",
+					"description": "attach to qemu's gdb stub",
+					"ignoreFailures": false
+				},
+				{
+					// Custom launch commands replace cppdbg's normal entry breakpoint,
+					// so create the temporary main breakpoint explicitly.
+					"text": "-break-insert -t -f main",
+					"description": "stop at the first instruction of main",
 					"ignoreFailures": false
 				}
 			],
+			"launchCompleteCommand": "exec-continue",
 
-			// Map the container's /work back to the folder on the Mac, so the
-			// editor highlights the right line as you step.
+			// Map the container's /work back to this folder, so the editor
+			// highlights the right line.
 			"sourceFileMap": {
 				"/work": "${fileDirname}"
 			},
 
 			"setupCommands": [
 				{
-					"description": "the target is x86-64 even though the Mac is arm64",
 					"text": "-gdb-set architecture i386:x86-64",
+					"description": "the target is x86-64 even though the Mac is arm64",
 					"ignoreFailures": false
 				},
 				{
-					"description": "Intel syntax, like NASM",
 					"text": "-gdb-set disassembly-flavor intel",
-					"ignoreFailures": true
-				},
-				{
-					"description": "readable structure printing",
-					"text": "-enable-pretty-printing",
+					"description": "Intel syntax, like NASM",
 					"ignoreFailures": true
 				}
-			]
+			],
+
+			"logging": { "engineLogging": true }
 		}
 	]
 }

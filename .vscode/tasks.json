@@ -2,11 +2,27 @@
 	"version": "2.0.0",
 	"tasks": [
 		{
+			"label": "asm: build current file (executable only)",
+			"detail": "Assemble + link the active .asm into an executable, without running it.",
+			"type": "shell",
+			"command": "\"${workspaceFolder}/build\" \"${file}\"",
+			"presentation": {
+				"reveal": "always",
+				"panel": "dedicated",
+				"clear": true,
+				"focus": true
+			},
+			"problemMatcher": []
+		},
+		{
 			"label": "asm: run current file",
 			"detail": "Assemble, link and run the .asm file in the active editor.",
 			"type": "shell",
 			"command": "\"${workspaceFolder}/asm\" \"${file}\"",
-			"group": { "kind": "build", "isDefault": true },
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			},
 			"presentation": {
 				"reveal": "always",
 				"panel": "dedicated",
@@ -72,7 +88,11 @@
 			"detail": "Used automatically when the F5 session ends.",
 			"type": "shell",
 			"command": "docker rm -f asm-dbg > /dev/null 2>&1 || true",
-			"presentation": { "reveal": "never", "panel": "shared", "close": true },
+			"presentation": {
+				"reveal": "never",
+				"panel": "shared",
+				"close": true
+			},
 			"problemMatcher": []
 		},
 		{
@@ -80,7 +100,11 @@
 			"detail": "Run once after cloning, or after editing the Dockerfile.",
 			"type": "shell",
 			"command": "docker build -t asm-course \"${workspaceFolder}\"",
-			"presentation": { "reveal": "always", "panel": "dedicated", "clear": true },
+			"presentation": {
+				"reveal": "always",
+				"panel": "dedicated",
+				"clear": true
+			},
 			"problemMatcher": []
 		},
 		{
@@ -88,7 +112,11 @@
 			"detail": "Delete every generated .o file and executable.",
 			"type": "shell",
 			"command": "find \"${workspaceFolder}/lectures code \" \"${workspaceFolder}/ps_code\" -type f ! -name '*.asm' ! -name '*.pdf' -delete && echo cleaned",
-			"presentation": { "reveal": "always", "panel": "dedicated", "clear": true },
+			"presentation": {
+				"reveal": "always",
+				"panel": "dedicated",
+				"clear": true
+			},
 			"problemMatcher": []
 		}
 	],

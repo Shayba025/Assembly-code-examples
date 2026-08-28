@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+# Assemble and link a .asm file into an executable, WITHOUT running it.
+#
+#     ./build "lectures code /code-0003.asm"
+#
+# Leaves two files next to the .asm:
+#     code-0003.o    the object file   (nasm output)
+#     code-0003      the executable    (linker output)
+#
+# The executable is a Linux x86-64 binary, so it cannot run on macOS directly.
+# Use ./asm to run it, or run it by hand inside the container:
+#     docker run --rm -v "$PWD/lectures code :/work" -w /work asm-course \
+#         qemu-x86_64 -L /usr/x86_64-linux-gnu ./code-0003 1 2 3
+set -euo pipefail
+
+if [ $# -lt 1 ]; then
+	echo "usage: $(basename "$0") file.asm" >&2
+	exit 1
+fi
+
+src="$1"
+dir="$(cd "$(dirname "$src")" && pwd)"
+base="$(basename "$src" .asm)"
+
+docker run --rm -v "$dir:/work" -w /work asm-course bash -c '
+	set -e
+	prog="$1"
+
+	nasm -f elf64 -g -F dwarf "$prog.asm" -o "$prog.o"
+	echo "  assembled  $prog.o"
+
+	if grep -qE "^[[:space:]]*global[[:space:]]+_start" "$prog.asm"; then
+		# defines _start: freestanding, link WITHOUT the C library
+		x86_64-linux-gnu-ld -z noexecstack -o "$prog" "$prog.o"
+	elif [ -f "${prog}_test.c" ]; then
+		# no main() of its own: link the C driver beside it
+		x86_64-linux-gnu-gcc -no-pie -g -Wl,-z,noexecstack \
+			-o "$prog" "${prog}_test.c" "$prog.o" -lm
+	else
+		x86_64-linux-gnu-gcc -no-pie -Wl,-z,noexecstack \
+			-o "$prog" "$prog.o" -lm
+	fi
+	echo "  linked     $prog"
+	x86_64-linux-gnu-readelf -h "$prog" \
+		| grep -E "Class|Machine|Type:" | sed "s/^/  /"
+' _ "$base"
+
+echo "Executable is at: $dir/$base"

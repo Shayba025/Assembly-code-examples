@@ -1,12 +1,10 @@
 #!/usr/bin/env bash
-# Assemble, link and DEBUG one of the course's x86-64 Linux NASM programs in gdb.
+# Debug one of the course's x86-64 Linux NASM programs.
 #
-#     ./debug "lectures code /code-0001.asm"
-#     ./debug "lectures code /code-0004.asm" 3        # with arguments
-#     echo "3, 9" | ./debug "lectures code /code-0001.asm"   # with input
+#     ./debug "lectures code /code-0003.asm" 1 2 3
 #
-# gdb opens already stopped at the first instruction of `main` and prints a
-# cheat sheet. Type `cheat` at any time to see it again.
+# Opens a split screen: registers on top, your source below. Type `si` to step
+# one instruction, then just press Enter to keep stepping. `q` quits.
 set -euo pipefail
 
 if [ $# -lt 1 ]; then
@@ -24,13 +22,10 @@ docker run --rm -it -v "$dir:/work" -w /work asm-course \
 
 		nasm -f elf64 -g -F dwarf "$prog.asm" -o "$prog.o"
 		if grep -qE "^[[:space:]]*global[[:space:]]+_start" "$prog.asm"; then
-			# the program defines _start, so it is a freestanding
-			# executable: link it WITHOUT the C library
 			x86_64-linux-gnu-ld -z noexecstack -o "$prog" "$prog.o"
 			entry=_start
 		else
 			if [ -f "${prog}_test.c" ]; then
-				# no main() of its own: link the C driver beside it
 				x86_64-linux-gnu-gcc -no-pie -g -Wl,-z,noexecstack \
 					-o "$prog" "${prog}_test.c" "$prog.o" -lm
 			else
@@ -40,65 +35,60 @@ docker run --rm -it -v "$dir:/work" -w /work asm-course \
 			entry=main
 		fi
 
-		# --- the gdb start-up script -------------------------------------
 		cat > /tmp/asmrc.gdb <<GDBRC
 set confirm off
 set pagination off
 set disassembly-flavor intel
 set architecture i386:x86-64
-set print pretty on
-
-define cheat
-echo \\n
-echo  ===================  gdb cheat sheet  ===================\\n
-echo \\n
-echo  STEPPING\\n
-echo    si          step ONE instruction (follows a call)\\n
-echo    ni          step one instruction (steps OVER a call)\\n
-echo    finish      run the current function to its end\\n
-echo    c           continue to the next breakpoint or the end\\n
-echo    q           quit\\n
-echo \\n
-echo  LOOKING AT REGISTERS\\n
-echo    p \$rax          one register, in decimal\\n
-echo    p/x \$rax        ...in hex        p/t \$rax   ...in binary\\n
-echo    info registers  all of them\\n
-echo    regs            the ones this course cares about\\n
-echo \\n
-echo  LOOKING AT MEMORY\\n
-echo    x/s \$rdi        the string a pointer points at\\n
-echo    x/8gx \$rsp      8 quadwords of stack, in hex\\n
-echo    x/1gd &a        one variable, by name, in decimal\\n
-echo \\n
-echo  THE CALL STACK\\n
-echo    bt              who called whom (frame 0 is where you are)\\n
-echo    info frame      return address and saved rbp of this frame\\n
-echo    up / down       move between frames\\n
-echo \\n
-echo  BREAKPOINTS\\n
-echo    break printf            stop whenever printf is called\\n
-echo    break $prog.asm:57      stop at line 57 of this file\\n
-echo    info breakpoints        list them\\n
-echo \\n
-echo  SEEING WHERE YOU ARE\\n
-echo    l               show source around the current line\\n
-echo    x/5i \$pc        the next 5 machine instructions\\n
-echo    layout regs     split screen: registers + source\\n
-echo                    (Ctrl-X then A turns the split screen off again)\\n
-echo \\n
-echo  Type  cheat  to see this again.\\n
-echo \\n
-end
 
 define regs
 info registers rax rbx rcx rdx rsi rdi rbp rsp
+end
+
+define vis
+tui enable
+layout split
+tui reg general
+focus cmd
+end
+
+define cheat
+echo \\n
+echo   si        step ONE instruction (goes into a call)\\n
+echo   ni        step one instruction (steps over a call)\\n
+echo   ENTER     repeat the last command\\n
+echo   finish    run this function to its end\\n
+echo   c         continue to the next breakpoint\\n
+echo   q         quit\\n
+echo \\n
+echo   regs           the main registers\\n
+echo   p \\\$rax         one register  (p/x hex, p/t binary)\\n
+echo   x/s \\\$rdi       the string a pointer points at\\n
+echo   x/8gx \\\$rsp     8 quadwords of stack\\n
+echo   bt             who called whom\\n
+echo \\n
+echo   break printf         stop when printf is called\\n
+echo   break $prog.asm:57   stop at line 57\\n
+echo   vis                  split screen on (Ctrl-X then A = off)\\n
+echo \\n
 end
 
 file ./$prog
 target remote :1234
 break $entry
 continue
-cheat
+
+echo \\n
+echo  ==================================================\\n
+echo    si      step ONE instruction   <-- the main one\\n
+echo    ENTER   repeat it (just keep pressing Enter)\\n
+echo    q       quit           cheat   more commands\\n
+echo  ==================================================\\n
+echo \\n
+
+# The split screen goes LAST: if the terminal cannot do it, only this is
+# lost, not the banner above.
+vis
 GDBRC
 
 		qemu-x86_64 -L /usr/x86_64-linux-gnu -g 1234 "./$prog" "$@" &
